@@ -225,5 +225,8 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
-    # asyncio.run(main(), debug=True)
+    try:
+        asyncio.run(main())
+        # asyncio.run(main(), debug=True)
+    except KeyboardInterrupt:
+        print("Service interrupted. Exiting gracefully...")
