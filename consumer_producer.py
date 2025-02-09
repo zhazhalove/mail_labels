@@ -44,7 +44,7 @@ class AbstractPrinter(ABC, Generic[T]):
         pass
 
 # Dymo Printer Implementation
-class DymoPrinter(AbstractPrinter[bytes]):
+class DymoPrinterWin(AbstractPrinter[bytes]):
     def __init__(self, printer_name: str):
         self.printer_name = printer_name
         self.settings = {}
@@ -93,7 +93,6 @@ class DymoPrinter(AbstractPrinter[bytes]):
         Retrieve printer status.
         """
         pass
-
 
 # Document Representation
 class Document:
@@ -271,7 +270,7 @@ async def consumer(queue: MessageQueue[Document], processor: DocumentProcessor[b
                 print(f"Processing failed for document: {document.filename}")
 
             # if result:
-            #     dymo_printer = DymoPrinter("\\\\network-printer-name")
+            #     dymo_printer = DymoPrinterWin("\\\\network-printer-name")
             #     dymo_printer.configure_printer({"dpi": 300, "paper_size": "104mm x 159mm"})
             #     dymo_printer.print_document(result)
             # else:
