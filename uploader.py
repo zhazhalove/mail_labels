@@ -99,7 +99,6 @@ def main() -> None:
     socket.connect(ZMQ_CONNECT_ADDRESS)
 
     folder_path = FOLDER
-    print(f"copy shipment labels to: {folder_path}")
     os.makedirs(folder_path, exist_ok=True) # Ensure the directory exists
     event_handler = MyEventHandler(folder_path=folder_path, socket=socket)
     observer = Observer()
@@ -107,8 +106,9 @@ def main() -> None:
     observer.start()
 
     try:
+        print(f"copy shipment labels to: {folder_path}")
         print("Service started. Press Ctrl+C to stop.")
-        
+
         while True:
             time.sleep(1)  # Keep the main thread alive
     except KeyboardInterrupt:
