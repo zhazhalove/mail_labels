@@ -1,0 +1,4 @@
+watchdog
+PyMuPDF
+Pillow
+pyzmq
