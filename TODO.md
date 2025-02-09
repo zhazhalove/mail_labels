@@ -4,5 +4,4 @@
 - ABC printer class
   - Concrete Dymo printer class
 - ZeroMQ Curve for secure transit communication
-
 - Observability
