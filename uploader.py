@@ -34,7 +34,7 @@ from typing import Dict
 ZMQ_CONNECT_ADDRESS = "tcp://localhost:5555"  # Use * for all available interfaces
 FOLDER = os.path.join(os.getenv("LOCALAPPDATA"), "pdf_monitor")
 
-class MyEventHandler(FileSystemEventHandler):
+class PDFEventProcessor(FileSystemEventHandler):
     def __init__(self, folder_path: str, socket: zmq.Socket):
         self.folder_path = folder_path
         self.socket = socket
@@ -103,7 +103,7 @@ def main() -> None:
 
     folder_path = FOLDER
     os.makedirs(folder_path, exist_ok=True) # Ensure the directory exists
-    event_handler = MyEventHandler(folder_path=folder_path, socket=socket)
+    event_handler = PDFEventProcessor(folder_path=folder_path, socket=socket)
     observer = Observer()
     observer.schedule(event_handler, path=folder_path, recursive=False)  # recursive=False if you only want the main folder
     observer.start()
