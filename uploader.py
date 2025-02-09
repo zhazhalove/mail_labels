@@ -107,6 +107,8 @@ def main() -> None:
     observer.start()
 
     try:
+        print("Service started. Press Ctrl+C to stop.")
+        
         while True:
             time.sleep(1)  # Keep the main thread alive
     except KeyboardInterrupt:
