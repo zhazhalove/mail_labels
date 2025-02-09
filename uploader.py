@@ -114,11 +114,15 @@ def main() -> None:
 
         while True:
             time.sleep(1)  # Keep the main thread alive
+        
     except KeyboardInterrupt:
+        print("Stopping service...")
+    finally:
         observer.stop()
-    observer.join()
-    socket.close()
-    context.term()
+        observer.join()
+        socket.close()
+        context.term()
+        print("Service stopped cleanly.")
 
 
 if __name__ == "__main__":
