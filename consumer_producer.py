@@ -9,7 +9,11 @@ from abc import ABC, abstractmethod
 from typing import Any, Generic, TypeVar
 from concurrent.futures import ProcessPoolExecutor
 from PIL import Image, ImageChops
+from pathlib import Path
 
+
+PNG_OUTPUT_FOLDER = Path("output_png")
+PNG_OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
 
 # Type Variable for Generics
 T = TypeVar('T')
@@ -169,7 +173,7 @@ async def consumer(queue: MessageQueue[Document], processor: DocumentProcessor[b
             print(f"Consumer processing: {document.filename}")
             result: bytes = await processor.process(document)
             if result:
-                output_filename = f"{document.filename}.png"  # Dynamic filename
+                output_filename = PNG_OUTPUT_FOLDER.joinpath(f"{document.filename}.png")
                 with open(output_filename, "wb") as f:
                     f.write(result)
                 print(f"Consumer processed and saved image to {output_filename}.")
