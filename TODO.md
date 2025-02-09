@@ -1,6 +1,8 @@
-- ZeroMQ Curve for secure transit communication
+- remove files after sucessful zeromq PUSH
 - Logging
 - Command-line argument handling
 - ABC printer class
   - Concrete Dymo printer class
+- ZeroMQ Curve for secure transit communication
+
 - Observability
