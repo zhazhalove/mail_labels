@@ -2,3 +2,4 @@ watchdog
 PyMuPDF
 Pillow
 pyzmq
+pywin32

@@ -4,12 +4,13 @@ zeromq for message passing, and a process pool to handle blocking PDF operations
 It implements a producer-consumer pattern with improved error handling and shutdown.
 """
 
-import zmq, zmq.asyncio, asyncio, time, fitz, io
+import zmq, zmq.asyncio, asyncio, time, fitz, io, win32print, win32ui
 from abc import ABC, abstractmethod
-from typing import Any, Generic, TypeVar
+from typing import Generic, TypeVar
 from concurrent.futures import ProcessPoolExecutor
 from PIL import Image, ImageChops
 from pathlib import Path
+
 
 
 PNG_OUTPUT_FOLDER = Path("output_png")
@@ -17,6 +18,81 @@ PNG_OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
 
 # Type Variable for Generics
 T = TypeVar('T')
+
+# Abstract Printer Class
+class AbstractPrinter(ABC, Generic[T]):
+    @abstractmethod
+    def print_document(self, document: T) -> None:
+        """
+        Print the given document.
+        """
+        pass
+
+    @abstractmethod
+    def configure_printer(self, settings: dict) -> None:
+        """
+        Configure the printer with the provided settings.
+        """
+        pass
+
+    @abstractmethod
+    def get_status(self) -> str:
+        """
+        Retrieve the current status of the printer.
+        """
+        pass
+
+# Dymo Printer Implementation
+class DymoPrinter(AbstractPrinter[bytes]):
+    def __init__(self, printer_name: str):
+        self.printer_name = printer_name
+        self.settings = {}
+    
+    def print_document(self, document: bytes) -> None:
+        """
+        Send a document to the Dymo printer over a Windows network.
+        """
+        if not document:
+            print("Error: No document content to print.")
+            return
+        
+        # Open printer
+        printer_handle = win32print.OpenPrinter(self.printer_name)
+        try:
+            printer_info = win32print.GetPrinter(printer_handle, 2)
+            printer_device = win32ui.CreateDC()
+            printer_device.CreatePrinterDC(self.printer_name)
+            
+            # Start document
+            job_id = win32print.StartDocPrinter(printer_handle, 1, ("Print Job", None, "RAW"))
+            win32print.StartPagePrinter(printer_handle)
+            
+            # Write data directly to the printer
+            win32print.WritePrinter(printer_handle, document)
+            
+            win32print.EndPagePrinter(printer_handle)
+            win32print.EndDocPrinter(printer_handle)
+            print(f"Document printed successfully on {self.printer_name}.")
+        
+        except Exception as e:
+            print(f"Printing failed: {e}")
+        
+        finally:
+            win32print.ClosePrinter(printer_handle)
+    
+    def configure_printer(self, settings: dict) -> None:
+        """
+        Apply configuration settings to the Dymo printer.
+        """
+        self.settings.update(settings)
+        print(f"Printer {self.printer_name} configured with settings: {self.settings}")
+    
+    def get_status(self) -> str:
+        """
+        Retrieve printer status.
+        """
+        pass
+
 
 # Document Representation
 class Document:
@@ -175,6 +251,7 @@ async def consumer(queue: MessageQueue[Document], processor: DocumentProcessor[b
             document: Document = await queue.get()
             print(f"Consumer processing: {document.filename}")
             result: bytes = await processor.process(document)
+            
             if result:
                 output_filename = PNG_OUTPUT_FOLDER.joinpath(f"{document.filename}.png")
                 with open(output_filename, "wb") as f:
@@ -182,12 +259,22 @@ async def consumer(queue: MessageQueue[Document], processor: DocumentProcessor[b
                 print(f"Consumer processed and saved image to {output_filename}.")
             else:
                 print(f"Processing failed for document: {document.filename}")
-            queue.task_done()
+
+            # if result:
+            #     dymo_printer = DymoPrinter("\\\\network-printer-name")
+            #     dymo_printer.configure_printer({"dpi": 300, "paper_size": "104mm x 159mm"})
+            #     dymo_printer.print_document(result)
+            # else:
+            #     print(f"Printing failed for document: {document.filename}")
+
         except asyncio.CancelledError:
             break
         except Exception as e:
             print(f"Consumer error: {e}")
             queue.task_done()
+        else:
+            queue.task_done()
+
     print("Consumer finished.")
 
 
