@@ -10,6 +10,7 @@ from typing import Generic, TypeVar
 from concurrent.futures import ProcessPoolExecutor
 from PIL import Image, ImageChops
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 
 
 
@@ -109,7 +110,7 @@ class DocumentProcessor(ABC, Generic[T]):
 # PDF Processor Implementation
 class PdfProcessor(DocumentProcessor[bytes]):
     def __init__(self):
-        self.executor = ProcessPoolExecutor()
+        self.executor = ThreadPoolExecutor()
 
     async def process(self, document: Document) -> bytes:
         try:
@@ -123,7 +124,7 @@ class PdfProcessor(DocumentProcessor[bytes]):
 
     def shutdown(self):
         """Ensure process pool executor shuts down cleanly."""
-        self.executor.shutdown(wait=True)
+        self.executor.shutdown(wait=True, cancel_futures=True)
     
     @staticmethod
     def Process_pdf_sync(pdf_data: bytes) -> bytes:
@@ -236,11 +237,12 @@ async def producer(queue: MessageQueue[Document], zmq_socket: zmq.asyncio.Socket
             await queue.put(document)
             print(f"Producer received and added: {document.filename}")
         except zmq.Again:
-            await asyncio.sleep(0.01)
+            await asyncio.sleep(0.01) # Prevent high CPU usage
         except asyncio.CancelledError:
             break
         except Exception as e:
             print(f"Producer error: {e}")
+
     print("Producer finished.")
 
 
@@ -249,9 +251,17 @@ async def consumer(queue: MessageQueue[Document], processor: DocumentProcessor[b
     while not shutdown_event.is_set() or not queue.empty():
         try:
             document: Document = await queue.get()
+            
             print(f"Consumer processing: {document.filename}")
+
+            # Skip processing if shutdown was requested
+            if shutdown_event.is_set():
+                print(f"Shutdown detected, skipping processing for {document.filename}")
+                break
+
             result: bytes = await processor.process(document)
             
+      
             if result:
                 output_filename = PNG_OUTPUT_FOLDER.joinpath(f"{document.filename}.png")
                 with open(output_filename, "wb") as f:
@@ -293,29 +303,33 @@ async def main() -> None:
 
     try:
         print("Service started. Press Ctrl+C to stop.")
-        while True:
+        
+        while not shutdown_event.is_set():
             await asyncio.sleep(10)  # Simulate some work
-            # raise KeyboardInterrupt  # Force interrupt for testing
+
     except KeyboardInterrupt:
         print("Service interrupted. Shutting down...")
+
         shutdown_event.set()  # Signal shutdown
 
         await queue.join()  # Wait for queue to be empty
 
-        # Gracefully cancel tasks with a timeout
-        done, pending = await asyncio.wait([producer_task, consumer_task], timeout=2.0)
+        # Use gather instead of wait for better task handling
+        results = await asyncio.gather(producer_task, consumer_task, return_exceptions=True)
 
-        for task in pending:
-            task.cancel()
-            try:
-                await task  # Wait for task to actually cancel (or raise CancelledError)
-            except asyncio.CancelledError:
-                pass
+        # Log any exceptions instead of letting them crash shutdown
+        for result in results:
+            if isinstance(result, Exception):
+                print(f"Task error during shutdown: {result}")
 
     finally:
+        print("Shutting down PdfProcessor...")
         processor.shutdown()
+
+        print("Closing ZeroMQ sockets...")
         socket.close()
         context.term()
+        
         print("Shutdown complete.")
 
 
