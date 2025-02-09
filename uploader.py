@@ -1,54 +1,30 @@
 """
-This script monitors a specified folder for changes in PDF files. When a PDF file is 
-modified or created, it reads the file content and sends it over a ZeroMQ PUSH socket.
+PDF File Monitor with ZeroMQ Messaging
 
-**Building and Running:**
+This script monitors a specific folder for newly created or modified PDF files
+and sends them over a ZeroMQ PUSH socket to a configured endpoint. The script
+uses the `watchdog` library to observe filesystem changes and detect relevant
+file events.
 
-1. **Prerequisites:**
-    - Python 3.6 or higher is recommended.
-    - Install the required packages:
-      ```bash
-      pip install pyzmq watchdog
-      ```
+Features:
+- Monitors a designated folder for new or modified PDF files.
+- Attempts to open and read PDF files, retrying if they are locked.
+- Sends file content via ZeroMQ PUSH socket.
+- Handles file deletions by removing them from the internal tracking dictionary.
+- Implements basic exception handling to manage file access errors.
 
-2. **Script Configuration:**
-    - Save the code as a Python file (e.g., `pdf_monitor.py`).
-    - Modify the `folder_path` variable in the `main` function to point to the 
-      directory you want to monitor. For example:
-      ```python
-      folder_path="/path/to/your/pdf/folder"  # Replace with your actual path
-      ```
-    - The `ZMQ_BIND_ADDRESS` constant defines the ZeroMQ socket address. You can change it if needed.
+Usage:
+- Run the script, and copy PDF files into the designated folder.
+- The script will attempt to read and send them via ZeroMQ.
 
-3. **Running the Script (Producer):**
-    - Execute the script from your terminal:
-      ```bash
-      python pdf_monitor.py
-      ```
-    - This will start the folder monitoring process and bind the ZeroMQ socket.
+Constants:
+- `ZMQ_CONNECT_ADDRESS`: Specifies the ZeroMQ address to connect to.
+- `folder_path`: The directory being monitored.
 
-4. **Running a Consumer (Receiver - separate script):**
-   - You'll need a separate script (e.g., `pdf_receiver.py`) to receive the PDF data. See the example below.
-
-5. **Testing:**
-    - Place or create PDF files in the monitored folder.
-    - Modify an existing PDF file in the folder.
-    - The `pdf_monitor.py` script will detect the changes and send the PDF data 
-      through the ZeroMQ socket.
-    - The `pdf_receiver.py` script will receive the data and save it. You should see the "Received and saved PDF." message.
-
-**Important Notes:**
-
-- The receiver script must be running *before* the producer script, as the producer binds the socket. 
-- Make sure the `ZMQ_BIND_ADDRESS` is the same in both scripts.
-- This example receiver simply saves the PDF to a file. You can modify it to perform other actions with the received PDF data.
-- Error handling is included to make the script more robust.
-- The `recursive=False` argument in `observer.schedule` means that only the top-level folder is monitored. Subfolders are not monitored. Change this to `recursive=True` if you need to monitor subfolders as well.
+To stop the script, use Ctrl+C.
 """
 
-import os
-import time
-import zmq
+import os, time, zmq
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from typing import Dict
