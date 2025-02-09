@@ -12,6 +12,7 @@ Features:
 - Sends file content via ZeroMQ PUSH socket.
 - Handles file deletions by removing them from the internal tracking dictionary.
 - Implements basic exception handling to manage file access errors.
+- Removes the file from the folder once it has been successfully sent.
 
 Usage:
 - Run the script, and copy PDF files into the designated folder.
@@ -74,6 +75,8 @@ class MyEventHandler(FileSystemEventHandler):
                                 self.socket.send(pdf_data, zmq.NOBLOCK)
                                 print(f"Sent PDF: {filename}")
 
+                            os.remove(filepath)  # Delete the file after successful send
+                            print(f"Deleted PDF after sending: {filename}")
                             break  # Successfully read the file, exit loop
                         except PermissionError as e:
                             print(f"Attempt {attempt + 1}/{retry_attempts} - File is locked: {filename}. Retrying in 0.5s...")
