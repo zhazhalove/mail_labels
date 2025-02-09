@@ -1,3 +1,4 @@
+- consumer_producer.py, constant for png output folder
 - Logging
 - Command-line argument handling
 - ABC printer class
