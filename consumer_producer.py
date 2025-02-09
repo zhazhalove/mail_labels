@@ -45,7 +45,10 @@ class PdfProcessor(DocumentProcessor[bytes]):
             print(f"Error processing PDF: {e}")
             return None  # Return None on error
 
-
+    def shutdown(self):
+        """Ensure process pool executor shuts down cleanly."""
+        self.executor.shutdown(wait=True)
+    
     @staticmethod
     def Process_pdf_sync(pdf_data: bytes) -> bytes:
         try:
@@ -223,6 +226,7 @@ async def main() -> None:
                 pass
 
     finally:
+        processor.shutdown()
         socket.close()
         context.term()
         print("Shutdown complete.")
