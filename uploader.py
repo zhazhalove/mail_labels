@@ -31,6 +31,7 @@ from typing import Dict
 
 # Define the ZeroMQ bind address
 ZMQ_CONNECT_ADDRESS = "tcp://localhost:5555"  # Use * for all available interfaces
+FOLDER = os.path.join(os.getenv("LOCALAPPDATA"), "pdf_monitor")
 
 class MyEventHandler(FileSystemEventHandler):
     def __init__(self, folder_path: str, socket: zmq.Socket):
@@ -97,7 +98,7 @@ def main() -> None:
     socket = context.socket(zmq.PUSH)
     socket.connect(ZMQ_CONNECT_ADDRESS)
 
-    folder_path = os.path.join(os.getenv("LOCALAPPDATA"), "pdf_monitor")
+    folder_path = FOLDER
     print(f"copy shipment labels to: {folder_path}")
     os.makedirs(folder_path, exist_ok=True) # Ensure the directory exists
     event_handler = MyEventHandler(folder_path=folder_path, socket=socket)
