@@ -1,6 +1,5 @@
-- Logging
 - Command-line argument handling
 - ABC printer class
-  - Concrete Dymo printer class
+  - Concrete Dymo printer SDK class
 - ZeroMQ Curve for secure transit communication
 - Observability

@@ -25,7 +25,7 @@ Constants:
 To stop the script, use Ctrl+C.
 """
 
-import os, time, zmq
+import os, time, zmq, structlog, logging.config, yaml
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from typing import Dict
@@ -33,6 +33,32 @@ from typing import Dict
 # Define the ZeroMQ bind address
 ZMQ_CONNECT_ADDRESS = "tcp://localhost:5555"  # Use * for all available interfaces
 FOLDER = os.path.join(os.getenv("LOCALAPPDATA"), "pdf_monitor")
+LOG_CONFIG = "logging_config.yaml"
+
+# Load Logging Configuration
+with open(LOG_CONFIG, "r") as f:
+    config = yaml.safe_load(f)
+    logging.config.dictConfig(config)
+
+structlog.configure(
+    processors=[
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.stdlib.add_log_level,  # Ensures log levels are structured
+        structlog.stdlib.PositionalArgumentsFormatter(),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        structlog.processors.JSONRenderer()
+    ],
+    context_class=dict,
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    wrapper_class=structlog.stdlib.BoundLogger,
+    cache_logger_on_first_use=True
+)
+
+logger = structlog.get_logger()
+# logger = structlog.get_logger("PDFMailShipmentDebug")
+
+
 
 class PDFEventProcessor(FileSystemEventHandler):
     def __init__(self, folder_path: str, socket: zmq.Socket):
@@ -52,7 +78,7 @@ class PDFEventProcessor(FileSystemEventHandler):
             filename = os.path.basename(filepath)
             if filename.lower().endswith(".pdf") and filename in self.last_checked_mtimes:
                 del self.last_checked_mtimes[filename]  # Remove from tracking
-                print(f"Removed tracking for deleted PDF: {filename}")
+                logger.info("Removed tracking for deleted PDF", filename=filename)
 
     def process_file_event(self, event):
         if not event.is_directory:  # Ignore directory changes
@@ -73,27 +99,32 @@ class PDFEventProcessor(FileSystemEventHandler):
                             with open(filepath, "rb") as f:
                                 pdf_data = f.read()
                                 self.socket.send(pdf_data, zmq.NOBLOCK)
-                                print(f"Sent PDF: {filename}")
+                                logger.info("Sent PDF", filename=filename)
 
                             os.remove(filepath)  # Delete the file after successful send
-                            print(f"Deleted PDF after sending: {filename}")
+                            logger.info("Deleted PDF after sending", filename=filename)
                             break  # Successfully read the file, exit loop
                         except PermissionError as e:
-                            print(f"Attempt {attempt + 1}/{retry_attempts} - File is locked: {filename}. Retrying in 0.5s...")
+                            logger.warning(
+                                "File is locked, retrying",
+                                filename=filename,
+                                attempt=attempt + 1,
+                                max_attempts=retry_attempts,
+                            )
                             time.sleep(0.5)  # Wait before retrying
                         except zmq.Again:
-                             print(f"Warning: No receiver available. Skipping PDF: {filename}")
+                             logger.warning("No receiver available, skipping", filename=filename)
                              break # Exit loop on other excepitons
                         except Exception as e:
-                            print(f"Error reading file {filename}: {e}")
+                            logger.error("Error reading file", filename=filename, error=str(e))
                             break  # Exit loop on other exceptions
 
                     self.last_checked_mtimes[filename] = mtime # Update last checked time
 
             except OSError as e:  # Catch potential OS errors like file not found
-                print(f"Error accessing file {filename}: {e}")
+                logger.error("Error accessing file", filename=filename, error=str(e))
             except Exception as e:
-                print(f"Error processing/sending file {filename}: {e}")
+                logger.error("Error processing/sending file", filename=filename, error=str(e))
 
 
 def main() -> None:
@@ -109,20 +140,20 @@ def main() -> None:
     observer.start()
 
     try:
-        print(f"copy shipment labels to: {folder_path}")
-        print("Service started. Press Ctrl+C to stop.")
+        logger.info("Service started", folder_path=folder_path)
+        logger.info("Service started. Press Ctrl+C to stop.")
 
         while True:
             time.sleep(1)  # Keep the main thread alive
         
     except KeyboardInterrupt:
-        print("Stopping service...")
+        logger.info("Stopping services...")
     finally:
         observer.stop()
         observer.join()
         socket.close()
         context.term()
-        print("Service stopped cleanly.")
+        logger.info("Services stopped cleanly.")
 
 
 if __name__ == "__main__":

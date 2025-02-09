@@ -1,0 +1,41 @@
+version: 1
+disable_existing_loggers: False
+
+formatters:
+  simple:
+    format: "%(asctime)s - %(levelname)s - %(message)s"
+
+  json:
+    format: "%(asctime)s - %(levelname)s - %(message)s"
+    class: "pythonjsonlogger.jsonlogger.JsonFormatter"
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    formatter: simple
+    level: INFO
+    stream: ext://sys.stdout
+
+  file:
+    class: logging.FileHandler
+    formatter: json
+    level: INFO
+    filename: pdfmailshipment.log
+    mode: "a"
+
+  windows_event_log:
+    class: logging.handlers.NTEventLogHandler
+    level: INFO
+    formatter: simple
+    appname: PDFMailShipment
+    logtype: Application
+
+loggers:
+  root:
+    level: INFO
+    handlers: [console, windows_event_log] # Ensure file logging works
+
+  PDFMailShipmentDebug:
+    level: DEBUG
+    handlers: [console, windows_event_log]
+    propagate: no
