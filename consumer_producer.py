@@ -7,7 +7,6 @@ It implements a producer-consumer pattern with improved error handling and shutd
 import zmq, zmq.asyncio, asyncio, time, fitz, io, win32print, win32ui, structlog, logging.config, yaml, uuid, sys
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
-from concurrent.futures import ProcessPoolExecutor
 from PIL import Image, ImageChops
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
