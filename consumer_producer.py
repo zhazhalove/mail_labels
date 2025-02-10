@@ -82,8 +82,6 @@ class DymoPrinterWin(AbstractPrinter[bytes]):
             logger.error("No document content to print.", script=sys.argv[0])
             return
         
-     
-
         try:
             # Open printer
             printer_handle = win32print.OpenPrinter(self.printer_name)
