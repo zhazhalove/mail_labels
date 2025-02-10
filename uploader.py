@@ -25,7 +25,7 @@ Constants:
 To stop the script, use Ctrl+C.
 """
 
-import os, time, zmq, structlog, logging.config, yaml
+import os, time, zmq, structlog, logging.config, yaml, sys
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from typing import Dict
@@ -78,7 +78,7 @@ class PDFEventProcessor(FileSystemEventHandler):
             filename = os.path.basename(filepath)
             if filename.lower().endswith(".pdf") and filename in self.last_checked_mtimes:
                 del self.last_checked_mtimes[filename]  # Remove from tracking
-                logger.info("Removed tracking for deleted PDF", filename=filename)
+                logger.info("Removed tracking for deleted PDF", filename=filename, script=sys.argv[0])
 
     def process_file_event(self, event):
         if not event.is_directory:  # Ignore directory changes
@@ -99,10 +99,10 @@ class PDFEventProcessor(FileSystemEventHandler):
                             with open(filepath, "rb") as f:
                                 pdf_data = f.read()
                                 self.socket.send(pdf_data, zmq.NOBLOCK)
-                                logger.info("Sent PDF", filename=filename)
+                                logger.info("Sent PDF", filename=filename, script=sys.argv[0])
 
                             os.remove(filepath)  # Delete the file after successful send
-                            logger.info("Deleted PDF after sending", filename=filename)
+                            logger.info("Deleted PDF after sending", filename=filename, script=sys.argv[0])
                             break  # Successfully read the file, exit loop
                         except PermissionError as e:
                             logger.warning(
@@ -110,21 +110,22 @@ class PDFEventProcessor(FileSystemEventHandler):
                                 filename=filename,
                                 attempt=attempt + 1,
                                 max_attempts=retry_attempts,
+                                script=sys.argv[0]
                             )
                             time.sleep(0.5)  # Wait before retrying
                         except zmq.Again:
-                             logger.warning("No receiver available, skipping", filename=filename)
+                             logger.warning("No receiver available, skipping", filename=filename, script=sys.argv[0])
                              break # Exit loop on other excepitons
                         except Exception as e:
-                            logger.error("Error reading file", filename=filename, error=str(e))
+                            logger.error("Error reading file", filename=filename, error=str(e), script=sys.argv[0])
                             break  # Exit loop on other exceptions
 
                     self.last_checked_mtimes[filename] = mtime # Update last checked time
 
             except OSError as e:  # Catch potential OS errors like file not found
-                logger.error("Error accessing file", filename=filename, error=str(e))
+                logger.error("Error accessing file", filename=filename, error=str(e), script=sys.argv[0])
             except Exception as e:
-                logger.error("Error processing/sending file", filename=filename, error=str(e))
+                logger.error("Error processing/sending file", filename=filename, error=str(e), script=sys.argv[0])
 
 
 def main() -> None:
@@ -140,20 +141,20 @@ def main() -> None:
     observer.start()
 
     try:
-        logger.info("Service started", folder_path=folder_path)
-        logger.info("Service started. Press Ctrl+C to stop.")
+        logger.info("Service started", folder_path=folder_path, script=sys.argv[0])
+        logger.info("Service started. Press Ctrl+C to stop.", script=sys.argv[0])
 
         while True:
             time.sleep(1)  # Keep the main thread alive
         
     except KeyboardInterrupt:
-        logger.info("Stopping services...")
+        logger.info("Stopping services...", script=sys.argv[0])
     finally:
         observer.stop()
         observer.join()
         socket.close()
         context.term()
-        logger.info("Services stopped cleanly.")
+        logger.info("Services stopped cleanly.", script=sys.argv[0])
 
 
 if __name__ == "__main__":

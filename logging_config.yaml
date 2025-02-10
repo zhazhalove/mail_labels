@@ -33,9 +33,9 @@ handlers:
 loggers:
   root:
     level: INFO
-    handlers: [console, windows_event_log] # Ensure file logging works
+    handlers: [console, file] # Ensure file logging works
 
   PDFMailShipmentDebug:
     level: DEBUG
-    handlers: [console, windows_event_log]
+    handlers: [console, file]
     propagate: no
