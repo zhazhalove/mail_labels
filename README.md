@@ -59,10 +59,10 @@ Receives PDFs and converts them into PNG images.
 
 ## Configuration
 Modify the following constants in the scripts if needed:
-- **ZeroMQ Address**: Update `ZMQ_CONNECT_ADDRESS` in `pdf_monitor.py` and `pdf_processor.py`.
-- **Folder Path**: Change `FOLDER` in `pdf_monitor.py` if necessary.
-- **PNG_OUTPUT_FOLDER**: PNG output folder.
-- **LOG_CONFIG**: structlog logging configuration file.
+- **ZeroMQ Address**: Update `ZMQ_CONNECT_ADDRESS` in `uploader.py` and `consumer_producer.py`.
+- **Folder**: Change `FOLDER` in `uploader.py` if necessary.
+- **PNG_OUTPUT_FOLDER**: PNG output folder in `consumer_producer.py`.
+- **LOG_CONFIG**: structlog logging configuration file in `uploader.py` and `consumer_producer.py`.
 
 ## Example Workflow
 1. Start `uploader.py`.
