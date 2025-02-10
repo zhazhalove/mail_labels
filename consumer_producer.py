@@ -25,17 +25,17 @@ with open(LOG_CONFIG, "r") as f:
 
 structlog.configure(
     processors=[
-        structlog.processors.TimeStamper(fmt="iso"),
-        structlog.stdlib.add_log_level,  # Ensures log levels are structured
-        structlog.stdlib.PositionalArgumentsFormatter(),
-        structlog.processors.StackInfoRenderer(),
-        structlog.processors.format_exc_info,
-        structlog.processors.JSONRenderer()
+        structlog.processors.TimeStamper(fmt="iso"),  # Adds a timestamp to log entries in ISO format.
+        structlog.stdlib.add_log_level,  # Ensures log levels are included in the structured output.
+        structlog.stdlib.PositionalArgumentsFormatter(),  # Formats positional arguments passed to log methods.
+        structlog.processors.StackInfoRenderer(),  # Adds stack information to log entries when exceptions occur.
+        structlog.processors.format_exc_info,  # Formats exception information for logging.
+        structlog.processors.JSONRenderer()  # Renders the log entries as JSON.
     ],
-    context_class=dict,
-    logger_factory=structlog.stdlib.LoggerFactory(),
-    wrapper_class=structlog.stdlib.BoundLogger,
-    cache_logger_on_first_use=True
+    context_class=dict,  # Specifies that the context should be a standard Python dictionary.
+    logger_factory=structlog.stdlib.LoggerFactory(),  # Uses the standard library's logging factory.
+    wrapper_class=structlog.stdlib.BoundLogger,  # Uses the standard library's bound logger wrapper.
+    cache_logger_on_first_use=True  # Caches the logger instance on first use for performance.
 )
 
 logger = structlog.get_logger()
