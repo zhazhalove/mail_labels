@@ -4,7 +4,7 @@ zeromq for message passing, and a process pool to handle blocking PDF operations
 It implements a producer-consumer pattern with improved error handling and shutdown.
 """
 
-import zmq, zmq.asyncio, asyncio, time, fitz, io, win32print, win32ui
+import zmq, zmq.asyncio, asyncio, time, fitz, io, win32print, win32ui, structlog, logging.config, yaml, uuid
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 from concurrent.futures import ProcessPoolExecutor
@@ -16,6 +16,31 @@ from concurrent.futures import ThreadPoolExecutor
 
 PNG_OUTPUT_FOLDER = Path("output_png")
 PNG_OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
+LOG_CONFIG = "logging_config.yaml"
+
+
+# Load Logging Configuration
+with open(LOG_CONFIG, "r") as f:
+    config = yaml.safe_load(f)
+    logging.config.dictConfig(config)
+
+structlog.configure(
+    processors=[
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.stdlib.add_log_level,  # Ensures log levels are structured
+        structlog.stdlib.PositionalArgumentsFormatter(),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        structlog.processors.JSONRenderer()
+    ],
+    context_class=dict,
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    wrapper_class=structlog.stdlib.BoundLogger,
+    cache_logger_on_first_use=True
+)
+
+logger = structlog.get_logger()
+# logger = structlog.get_logger("PDFMailShipmentDebug")
 
 # Type Variable for Generics
 T = TypeVar('T')
@@ -54,7 +79,7 @@ class DymoPrinterWin(AbstractPrinter[bytes]):
         Send a document to the Dymo printer over a Windows network.
         """
         if not document:
-            print("Error: No document content to print.")
+            logger.error("No document content to print.")
             return
         
         # Open printer
@@ -73,10 +98,10 @@ class DymoPrinterWin(AbstractPrinter[bytes]):
             
             win32print.EndPagePrinter(printer_handle)
             win32print.EndDocPrinter(printer_handle)
-            print(f"Document printed successfully on {self.printer_name}.")
+            logger.info("Document printed successfully", printer=self.printer_name)
         
         except Exception as e:
-            print(f"Printing failed: {e}")
+            logger.exception("Printing failed", error=str(e))
         
         finally:
             win32print.ClosePrinter(printer_handle)
@@ -86,7 +111,7 @@ class DymoPrinterWin(AbstractPrinter[bytes]):
         Apply configuration settings to the Dymo printer.
         """
         self.settings.update(settings)
-        print(f"Printer {self.printer_name} configured with settings: {self.settings}")
+        logger.info("Printer configured", printer=self.printer_name, settings=self.settings)
     
     def get_status(self) -> str:
         """
@@ -98,7 +123,7 @@ class DymoPrinterWin(AbstractPrinter[bytes]):
 class Document:
     def __init__(self, content: bytes, filename: str = None):
         self.content: bytes = content
-        self.filename: str = filename or f"document_{time.strftime('%Y%m%d%H%M%S')}"  # Dynamic filename
+        self.filename: str = filename or f"document_{time.strftime('%Y%m%d%H%M%S')}_{uuid.uuid4()}"
 
 # Document Processor Interface
 class DocumentProcessor(ABC, Generic[T]):
@@ -118,7 +143,7 @@ class PdfProcessor(DocumentProcessor[bytes]):
             img_bytes = await loop.run_in_executor(self.executor, PdfProcessor.Process_pdf_sync, pdf_data)
             return img_bytes
         except Exception as e:
-            print(f"Error processing PDF: {e}")
+            logger.error("Error processing PDF", error=str(e))
             return None  # Return None on error
 
     def shutdown(self):
@@ -174,10 +199,10 @@ class PdfProcessor(DocumentProcessor[bytes]):
                         image.save(output, format="PNG")  # Save as PNG
                         return output.getvalue()
                 else:
-                    print("Error: PDF document is empty.")
+                    logger.error("Error: PDF document is empty.")
                     return None
         except Exception as e:
-            print(f"Error in Process_pdf_sync: {e}")
+            logger.error("Error in Process_pdf_sync", error=str(e))
             return None
 
 
@@ -234,15 +259,15 @@ async def producer(queue: MessageQueue[Document], zmq_socket: zmq.asyncio.Socket
             pdf_data: bytes = await zmq_socket.recv(flags=zmq.NOBLOCK)
             document = Document(pdf_data)  # , filename="received.pdf"  # You could add filename here if sender provides it
             await queue.put(document)
-            print(f"Producer received and added: {document.filename}")
+            logger.info("Producer received document", filename=document.filename)
         except zmq.Again:
             await asyncio.sleep(0.01) # Prevent high CPU usage
         except asyncio.CancelledError:
             break
         except Exception as e:
-            print(f"Producer error: {e}")
+            logger.error("Producer error", error=str(e))
 
-    print("Producer finished.")
+    logger.info("Producer finished.")
 
 
 # Consumer
@@ -251,11 +276,11 @@ async def consumer(queue: MessageQueue[Document], processor: DocumentProcessor[b
         try:
             document: Document = await queue.get()
             
-            print(f"Consumer processing: {document.filename}")
+            logger.info("Consumer processing document", filename=document.filename)
 
             # Skip processing if shutdown was requested
             if shutdown_event.is_set():
-                print(f"Shutdown detected, skipping processing for {document.filename}")
+                logger.info("Shutdown detected, skipping processing", filename=document.filename)
                 break
 
             result: bytes = await processor.process(document)
@@ -265,9 +290,9 @@ async def consumer(queue: MessageQueue[Document], processor: DocumentProcessor[b
                 output_filename = PNG_OUTPUT_FOLDER.joinpath(f"{document.filename}.png")
                 with open(output_filename, "wb") as f:
                     f.write(result)
-                print(f"Consumer processed and saved image to {output_filename}.")
+                logger.info("Consumer processed and saved image", output_filename=str(output_filename))
             else:
-                print(f"Processing failed for document: {document.filename}")
+                logger.error("Processing failed for document", filename=document.filename)
 
             # if result:
             #     dymo_printer = DymoPrinterWin("\\\\network-printer-name")
@@ -279,12 +304,12 @@ async def consumer(queue: MessageQueue[Document], processor: DocumentProcessor[b
         except asyncio.CancelledError:
             break
         except Exception as e:
-            print(f"Consumer error: {e}")
+            logger.exception("Consumer error", error=str(e))
             queue.task_done()
         else:
             queue.task_done()
 
-    print("Consumer finished.")
+    logger.info("Consumer finished.")
 
 
 # Main Function
@@ -301,13 +326,13 @@ async def main() -> None:
     consumer_task = asyncio.create_task(consumer(queue, processor, shutdown_event))
 
     try:
-        print("Service started. Press Ctrl+C to stop.")
+        logger.info("Service started. Press Ctrl+C to stop.")
         
         while not shutdown_event.is_set():
             await asyncio.sleep(10)  # Simulate some work
 
     except KeyboardInterrupt:
-        print("Service interrupted. Shutting down...")
+        logger.warning("Service interrupted. Shutting down...")
 
         shutdown_event.set()  # Signal shutdown
 
@@ -319,17 +344,17 @@ async def main() -> None:
         # Log any exceptions instead of letting them crash shutdown
         for result in results:
             if isinstance(result, Exception):
-                print(f"Task error during shutdown: {result}")
+                logger.exception("Task error during shutdown", error=str(result))
 
     finally:
-        print("Shutting down PdfProcessor...")
+        logger.info("Shutting down PdfProcessor...")
         processor.shutdown()
 
-        print("Closing ZeroMQ sockets...")
+        logger.info("Closing ZeroMQ sockets...")
         socket.close()
         context.term()
         
-        print("Shutdown complete.")
+        logger.info("Shutdown complete.")
 
 
 if __name__ == "__main__":
@@ -337,4 +362,4 @@ if __name__ == "__main__":
         asyncio.run(main())
         # asyncio.run(main(), debug=True)
     except KeyboardInterrupt:
-        print("Service interrupted. Exiting gracefully...")
+        logger.warning("Service interrupted. Exiting gracefully...")
