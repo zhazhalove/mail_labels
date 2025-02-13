@@ -3,3 +3,6 @@
 /output_png
 *.log
 test_samples/Test_UPS_2025.pdf
+opencv_greatest_contour/opencv_greatest_contour.egg-info
+opencv_greatest_contour/build
+opencv_greatest_contour/opencv_greatest_contour/__pycache__

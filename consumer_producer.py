@@ -10,6 +10,7 @@ from typing import Generic, TypeVar
 from PIL import Image, ImageChops
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
+from opencv_greatest_contour import pdf_bytes_to_image, find_largest_rectangle, crop_rectangle
 
 
 
@@ -131,7 +132,8 @@ class DocumentProcessor(ABC, Generic[T]):
         pass
 
 # PDF Processor Implementation
-class PdfProcessor(DocumentProcessor[bytes]):
+class PdfProcessorUPSCrop(DocumentProcessor[bytes]):
+
     def __init__(self):
         self.executor = ThreadPoolExecutor()
 
@@ -139,70 +141,35 @@ class PdfProcessor(DocumentProcessor[bytes]):
         try:
             pdf_data = document.content
             loop = asyncio.get_running_loop()
-            img_bytes = await loop.run_in_executor(self.executor, PdfProcessor.Process_pdf_sync, pdf_data)
+            img_bytes = await loop.run_in_executor(self.executor, PdfProcessorUPSCrop.Process_pdf_sync, pdf_data)
             return img_bytes
         except Exception as e:
-            logger.error("Error processing PDF", error=str(e), script=sys.argv[0])
-            return None  # Return None on error
+            pass
+
+    @staticmethod
+    def Process_pdf_sync(pdf_data: bytes) -> bytes:
+        try:
+            image_bytes = pdf_bytes_to_image(pdf_data) # Convert PDF bytes to image
+            largest_rect = find_largest_rectangle(image_bytes)  # Detect largest rectangle
+            cropped_image = crop_rectangle(image_bytes, largest_rect)
+
+            if cropped_image is not None:
+                # Convert the cropped NumPy array to a PIL image
+                cropped_pil = Image.fromarray(cropped_image)
+
+                with io.BytesIO() as output:
+                    cropped_pil.save(output, format="PNG")  # Save as PNG
+                    return output.getvalue()
+            else:
+                return None
+        except Exception as e:
+            logger.error("Error in Process_pdf_sync", error=str(e), script=sys.argv[0])
+            return None
+
 
     def shutdown(self):
         """Ensure process pool executor shuts down cleanly."""
         self.executor.shutdown(wait=True, cancel_futures=True)
-    
-    @staticmethod
-    def Process_pdf_sync(pdf_data: bytes) -> bytes:
-        try:
-            with fitz.open(stream=pdf_data, filetype="pdf") as doc:
-                if len(doc) > 0:  # Ensure the document has at least one page
-                    pixmap = doc[0].get_pixmap()
-                    
-                    # Convert to PIL Image
-                    image = Image.frombytes("RGB", [pixmap.width, pixmap.height], pixmap.samples)
-                    
-                    # Step 1: Auto-crop whitespace
-                    # Convert image to grayscale and get the bounding box of non-white pixels
-                    bg = Image.new("RGB", image.size, "white")  # White background for comparison
-                    diff = ImageChops.difference(image, bg)
-                    bbox = diff.getbbox()  # Get bounding box of content
-                    
-                    if bbox:
-                        image = image.crop(bbox)  # Crop to content
-
-                    # Step 2: Resize while maintaining aspect ratio
-                    #
-                    # Target Dymo Label Size in Pixels (300 DPI)
-                    # 
-                    # DPI (Dots Per Inch) means how many pixels (dots) are in one inch. 
-                    # The given label dimensions are:
-                    #   - Width: 104 mm
-                    #   - Height: 159 mm
-                    # 
-                    # To convert millimeters to inches, use:
-                    #   1 inch = 25.4 mm
-                    # 
-                    # So, the width and height in inches are:
-                    #   width_in_inches  = 104 mm  / 25.4 ≈ 4.094 inches
-                    #   height_in_inches = 159 mm  / 25.4 ≈ 6.260 inches
-                    #
-                    # Since the label printer works at 300 DPI, multiply by 300:
-                    #   target_width  = 4.094 inches  * 300 ≈ 1228 pixels
-                    #   target_height = 6.260 inches  * 300 ≈ 1879 pixels
-                    #
-                    # These values define the expected image size in pixels when printing at 300 DPI
-                    target_width = 1228
-                    target_height = 1879
-                    image.thumbnail((target_width, target_height), Image.LANCZOS)
-
-                    # Convert back to bytes
-                    with io.BytesIO() as output:
-                        image.save(output, format="PNG")  # Save as PNG
-                        return output.getvalue()
-                else:
-                    logger.error("Error: PDF document is empty.", script=sys.argv[0])
-                    return None
-        except Exception as e:
-            logger.error("Error in Process_pdf_sync", error=str(e), script=sys.argv[0])
-            return None
 
 
 # Message Queue Abstraction
@@ -281,7 +248,7 @@ async def consumer(queue: MessageQueue[Document], processor: DocumentProcessor[b
             if shutdown_event.is_set():
                 logger.info("Shutdown detected, skipping processing", filename=document.filename, script=sys.argv[0])
                 break
-
+            
             result: bytes = await processor.process(document)
             
       
@@ -314,7 +281,7 @@ async def consumer(queue: MessageQueue[Document], processor: DocumentProcessor[b
 # Main Function
 async def main() -> None:
     queue: MessageQueue[Document] = AsyncQueue(maxsize=10)
-    processor: DocumentProcessor[bytes] = PdfProcessor()
+    processor: DocumentProcessor[bytes] = PdfProcessorUPSCrop()
     shutdown_event = asyncio.Event()
 
     context: zmq.asyncio.Context = zmq.asyncio.Context()
