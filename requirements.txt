@@ -6,3 +6,6 @@ pywin32; sys_platform == "win32"
 python-json-logger
 structlog
 PyYAML
+opencv-python
+numpy
+matplotlib
