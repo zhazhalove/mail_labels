@@ -31,16 +31,6 @@ def find_largest_rectangle(image):
     return largest_rect  # Return coordinates of the largest rectangle
 
 
-# def highlight_and_crop(image, rect):
-#     """Draw a rectangle around the largest detected contour and crop it."""
-#     if rect:
-#         x, y, w, h = rect
-#         highlighted_image = image.copy()  # Create a copy to draw on
-#         cv2.rectangle(highlighted_image, (x, y), (x + w, y + h), (0, 255, 0), 3)  # Draw a green rectangle
-#         cropped_image = image[y:y + h, x:x + w]  # Crop the detected rectangle
-#         return highlighted_image, cropped_image  # Return both highlighted and cropped images
-#     return image, None  # Return original image if no rectangle is found
-
 def highlight_rectangle(image, rect):
     """Draw a rectangle around the given contour."""
     if rect:
