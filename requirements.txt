@@ -2,10 +2,11 @@ watchdog
 PyMuPDF
 Pillow
 pyzmq
-pywin32; sys_platform == "win32"
+pywin32
 python-json-logger
 structlog
 PyYAML
 opencv-python
 numpy
 matplotlib
+./opencv_greatest_contour

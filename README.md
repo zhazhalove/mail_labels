@@ -1,74 +1,111 @@
-# PDF File Monitor with ZeroMQ Messaging
+# PDF File Monitor & Processor
+
+This repository contains two Python scripts that implement a ZeroMQ-based system for monitoring, processing, and printing PDF files.
 
 ## Overview
-This repository contains two Python scripts that work together to monitor a directory for PDF files, send them over a ZeroMQ messaging system, and process them asynchronously.
 
-### Features
-- **File Monitoring**: Watches a specific folder for new or modified PDF files.
-- **ZeroMQ Messaging**: Uses ZeroMQ PUSH-PULL sockets for inter-process communication.
-- **Automatic File Handling**: Reads, processes, and deletes PDFs after successful transmission.
-- **Asynchronous Processing**: Leverages asyncio for non-blocking message handling and PDF conversion.
-- **Image Conversion**: Converts PDFs to PNG images with auto-cropping and resizing.
-- **Resilient Error Handling**: Retries locked files and gracefully handles errors.
+### Components
+
+1. **`uploader.py`**: Monitors a designated folder for new or modified PDF files and sends them over a ZeroMQ PUSH socket.
+2. **`consumer_producer.py`**: Receives and processes PDF files asynchronously, extracting relevant portions and optionally printing them to a Dymo printer.
+
+## Features
+
+### `uploader.py`
+
+- Watches a folder (`%LOCALAPPDATA%/pdf_monitor`) for newly added or modified PDF files.
+- Reads PDF content and sends it via a ZeroMQ PUSH socket.
+- Retries file access if the PDF is locked.
+- Deletes successfully processed files.
+- Logs events using `structlog`.
+
+### `consumer_producer.py`
+
+- Implements a producer-consumer pattern using `asyncio` and `ZeroMQ`.
+- Processes received PDFs, extracting relevant regions using OpenCV.
+- Converts PDF pages to images using `PyMuPDF` (`fitz`).
+- Saves cropped images as PNG files.
+- Optionally prints the processed output to a Dymo printer.
+- Gracefully handles shutdown and errors.
 
 ## Installation
+
 ### Prerequisites
+
 Ensure you have the following installed:
+
 - Python 3.10+
+- `pip` package manager
+- Required dependencies (listed below)
+
+### Dependencies
+
+Install dependencies using:
+
+```PowerShell
+pip install -r requirements.txt
+```
+
+Dependencies include:
+
+- `watchdog` (for monitoring file system events)
+- `zmq` and `zmq.asyncio` (for ZeroMQ messaging)
+- `structlog` (for structured logging)
+- `PyMuPDF` (`fitz`) (for PDF processing)
+- `Pillow` (for image handling)
+- `opencv-python` (for contour detection)
+- `pyyaml` (for logging configuration)
+- `pywin32` (for Windows printer handling)
+- `opencv_greatest_contour` (tools to extract a shipping label from a pdf)
 
 ## Usage
 
-### Step 1: Run the PDF File Monitor
-This script watches a directory for PDF files, reads them, and sends them via ZeroMQ.
-```sh
+### Running the Uploader
+
+This script monitors a folder for PDFs and sends them over ZeroMQ.
+
+```PowerShell
 python uploader.py
 ```
-**Behavior:**
-- Monitors a designated folder (`%LOCALAPPDATA%/pdf_monitor` on Windows).
-- Sends the file content over a ZeroMQ PUSH socket (`tcp://localhost:5555`).
-- Deletes the file after successful transmission.
 
-### Step 2: Run the PDF Processor
-This script asynchronously receives PDFs, processes them into images, and saves them as PNGs.
-```sh
+### Running the Consumer-Producer
+
+This script receives, processes, and optionally prints PDFs.
+
+```PowerShell
 python consumer_producer.py
 ```
-**Behavior:**
-- Binds to ZeroMQ PULL socket (`tcp://*:5555`).
-- Converts the first page of each received PDF to a PNG image.
-- Auto-crops whitespace and resizes for label printing (Dymo label format: 1228x1879 pixels).
-- Saves the processed image with a dynamically generated filename.
-- Prints the image label to a printer (dymo)
 
-### Stopping the Services
-Both scripts can be stopped using `Ctrl+C`.
+### Folder Path for PDFs
 
-## File Descriptions
+The uploader watches:
 
-### `uploader.py`
-Monitors a directory and sends PDFs over ZeroMQ.
-- Uses `watchdog` to track file changes.
-- Implements retry logic for locked files.
-- Deletes successfully sent files.
+- **Windows**: `%LOCALAPPDATA%\pdf_monitor`
 
-### `consumer_producer.py`
-Receives PDFs and converts them into PNG images.
-- Uses `asyncio` for non-blocking message handling.
-- Processes PDFs using `pymupdf` and `Pillow`.
-- Implements a producer-consumer pattern with an async queue.
+### Configuring Logging
 
-## Configuration
-Modify the following constants in the scripts if needed:
-- **ZeroMQ Address**: Update `ZMQ_CONNECT_ADDRESS` in `uploader.py` and `consumer_producer.py`.
-- **Folder**: Change `FOLDER` in `uploader.py` if necessary.
-- **PNG_OUTPUT_FOLDER**: PNG output folder in `consumer_producer.py`.
-- **LOG_CONFIG**: structlog logging configuration file in `uploader.py` and `consumer_producer.py`.
+Logging settings are defined in `logging_config.yaml`. You can adjust verbosity, format, and log file locations.
 
-## Example Workflow
-1. Start `uploader.py`.
-2. Start `consumer_producer.py`.
-3. Copy a PDF into `%LOCALAPPDATA%/pdf_monitor`.
-4. The file will be detected, read, sent, processed, saved as an image, and sent to a printer.
+## How It Works
+
+1. `uploader.py` detects new PDFs and sends them via ZeroMQ.
+2. `consumer_producer.py` receives the PDFs, extracts useful regions, and saves them as PNGs.
+3. Optionally, the processed PNG can be sent to a Dymo printer.
+4. The system runs asynchronously with structured logging and error handling.
+
+## Customization
+
+- **Change the monitored folder**: Modify `FOLDER` in `uploader.py`.
+- **Change the ZeroMQ address**: Update `ZMQ_CONNECT_ADDRESS` in both scripts.
+- **Enable printing**: Uncomment the Dymo printing section in `consumer_producer.py` and configure the correct printer name.
+
+## Error Handling
+
+- If a PDF is locked, the uploader retries access before skipping it.
+- If no receiver is available, the uploader logs a warning and skips the file.
+- Processing failures in the consumer log an error but do not halt execution.
+- Graceful shutdown is implemented for clean exits.
 
 ## License
+
 This project is licensed under the MIT License.
