@@ -10,3 +10,5 @@ opencv-python
 numpy
 matplotlib
 ./opencv_greatest_contour
+./printer_pkg
+./document_pkg

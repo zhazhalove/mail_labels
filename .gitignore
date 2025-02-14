@@ -6,3 +6,9 @@ test_samples/Test_UPS_2025.pdf
 opencv_greatest_contour/opencv_greatest_contour.egg-info
 opencv_greatest_contour/build
 opencv_greatest_contour/opencv_greatest_contour/__pycache__
+document_pkg/document_pkg.egg-info
+document_pkg/build
+document_pkg/document_pkg/__pycache__
+printer_pkg/build
+printer_pkg/printer_pkg.egg-info
+printer_pkg/printer_pkg/__pycache__

@@ -4,14 +4,14 @@ zeromq for message passing, and a process pool to handle blocking PDF operations
 It implements a producer-consumer pattern with improved error handling and shutdown.
 """
 
-import zmq, zmq.asyncio, asyncio, time, fitz, io, win32print, win32ui, structlog, logging.config, yaml, uuid, sys
+import zmq, zmq.asyncio, asyncio, io, structlog, logging.config, yaml, sys
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
-from PIL import Image, ImageChops
+from PIL import Image
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from opencv_greatest_contour import pdf_bytes_to_image, find_largest_rectangle, crop_rectangle
-
+from document_pkg import Document, DocumentProcessor
 
 
 PNG_OUTPUT_FOLDER = Path("output_png")
@@ -45,91 +45,6 @@ logger = structlog.get_logger()
 # Type Variable for Generics
 T = TypeVar('T')
 
-# Abstract Printer Class
-class AbstractPrinter(ABC, Generic[T]):
-    @abstractmethod
-    def print_document(self, document: T) -> None:
-        """
-        Print the given document.
-        """
-        pass
-
-    @abstractmethod
-    def configure_printer(self, settings: dict) -> None:
-        """
-        Configure the printer with the provided settings.
-        """
-        pass
-
-    @abstractmethod
-    def get_status(self) -> str:
-        """
-        Retrieve the current status of the printer.
-        """
-        pass
-
-# Dymo Printer Implementation
-class DymoPrinterWin(AbstractPrinter[bytes]):
-    def __init__(self, printer_name: str):
-        self.printer_name = printer_name
-        self.settings = {}
-    
-    def print_document(self, document: bytes) -> None:
-        """
-        Send a document to the Dymo printer over a Windows network.
-        """
-        if not document:
-            logger.error("No document content to print.", script=sys.argv[0])
-            return
-        
-        try:
-            # Open printer
-            printer_handle = win32print.OpenPrinter(self.printer_name)
-            printer_info = win32print.GetPrinter(printer_handle, 2)
-            printer_device = win32ui.CreateDC()
-            printer_device.CreatePrinterDC(self.printer_name)
-            
-            # Start document
-            job_id = win32print.StartDocPrinter(printer_handle, 1, ("Print Job", None, "RAW"))
-            win32print.StartPagePrinter(printer_handle)
-            
-            # Write data directly to the printer
-            win32print.WritePrinter(printer_handle, document)
-            
-            win32print.EndPagePrinter(printer_handle)
-            win32print.EndDocPrinter(printer_handle)
-            logger.info("Document printed successfully", printer=self.printer_name, script=sys.argv[0])
-        
-        except Exception as e:
-            logger.exception("Printing failed", error=str(e), script=sys.argv[0])
-        
-        finally:
-            win32print.ClosePrinter(printer_handle)
-    
-    def configure_printer(self, settings: dict) -> None:
-        """
-        Apply configuration settings to the Dymo printer.
-        """
-        self.settings.update(settings)
-        logger.info("Printer configured", printer=self.printer_name, settings=self.settings, script=sys.argv[0])
-    
-    def get_status(self) -> str:
-        """
-        Retrieve printer status.
-        """
-        pass
-
-# Document Representation
-class Document:
-    def __init__(self, content: bytes, filename: str = None):
-        self.content: bytes = content
-        self.filename: str = filename or f"document_{time.strftime('%Y%m%d%H%M%S')}_{uuid.uuid4()}"
-
-# Document Processor Interface
-class DocumentProcessor(ABC, Generic[T]):
-    @abstractmethod
-    async def process(self, document: Document) -> T:
-        pass
 
 # PDF Processor Implementation
 class PdfProcessorUPSCrop(DocumentProcessor[bytes]):
