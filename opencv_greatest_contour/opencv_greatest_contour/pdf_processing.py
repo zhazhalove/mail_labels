@@ -62,33 +62,3 @@ def _process_image_and_save(image: np.ndarray, output_path: str) -> None:
         print(f"Highlighted image saved to: {output_highlighted_path}")
     else:
         print("No suitable contour found to highlight.")
-
-
-# def process_pdf_and_extract_label(pdf_path: str, output_path: str) -> None:
-#     """Extract the largest rectangular region (e.g., shipping label) from a PDF and save it as an image."""
-#     image = pdf_to_image(pdf_path)  # Convert PDF to image
-#     largest_rect = find_largest_rectangle(image)  # Detect largest rectangle
-#     highlighted_image = highlight_rectangle(image, largest_rect)
-#     cropped_image = crop_rectangle(image, largest_rect)
-
-#     # Save the cropped image if detected
-#     if cropped_image is not None:
-#         cropped_pil = Image.fromarray(cropped_image)  # Convert cropped image to PIL format
-#         base, file = os.path.split(output_path)
-#         filename, ext = os.path.splitext(file)
-#         output_cropped_path = os.path.join(base, f"{filename}-cropped{ext}")
-#         cropped_pil.save(output_cropped_path)  # Save the image
-#         print(f"Cropped image saved to: {output_cropped_path}")
-#     else:
-#         print("No suitable contour found for cropping.")
-    
-#     # Save the highlighted image if detected
-#     if highlighted_image is not None:
-#         highlighted_pil = Image.fromarray(highlighted_image)  # Convert highlighted image to PIL format
-#         base, file = os.path.split(output_path)
-#         filename, ext = os.path.splitext(file)
-#         output_highlighted_path = os.path.join(base, f"{filename}-highlighted{ext}")
-#         highlighted_pil.save(output_highlighted_path)  # Save the image
-#         print(f"Highlighted image saved to: {output_highlighted_path}")
-#     else:
-#         print("No suitable contour found to highlight.")
