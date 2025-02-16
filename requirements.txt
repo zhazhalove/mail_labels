@@ -9,6 +9,8 @@ PyYAML
 opencv-python
 numpy
 matplotlib
+requests
+urllib3
 ./opencv_greatest_contour
 ./printer_pkg
 ./document_pkg
