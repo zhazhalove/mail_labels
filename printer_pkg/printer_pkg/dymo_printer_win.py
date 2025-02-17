@@ -23,7 +23,7 @@ class DymoLabel:
     
     def generate_label_xml(self) -> str:
         """Generates the full XML string for a DYMO label with the encoded image."""
-        return f'''<?xml version="1.0" encoding="utf-8"?>
+        return f"""<?xml version="1.0" encoding="utf-8"?>
 <DesktopLabel Version="1">
   <DYMOLabel Version="4">
     <Description>DYMO Label</Description>
@@ -55,12 +55,59 @@ class DymoLabel:
       <LabelObjects>
         <ImageObject>
           <Name>ImageObject0</Name>
+          <Brushes>
+            <BackgroundBrush>
+              <SolidColorBrush>
+                <Color A="0" R="0" G="0" B="0"></Color>
+              </SolidColorBrush>
+            </BackgroundBrush>
+            <BorderBrush>
+              <SolidColorBrush>
+                <Color A="1" R="0" G="0" B="0"></Color>
+              </SolidColorBrush>
+            </BorderBrush>
+            <StrokeBrush>
+              <SolidColorBrush>
+                <Color A="1" R="0" G="0" B="0"></Color>
+              </SolidColorBrush>
+            </StrokeBrush>
+            <FillBrush>
+              <SolidColorBrush>
+                <Color A="0" R="0" G="0" B="0"></Color>
+              </SolidColorBrush>
+            </FillBrush>
+          </Brushes>
+          <Rotation>Rotation0</Rotation>
+          <OutlineThickness>1</OutlineThickness>
+          <IsOutlined>False</IsOutlined>
+          <BorderStyle>SolidLine</BorderStyle>
+          <Margin>
+            <DYMOThickness Left="0" Top="0" Right="0" Bottom="0" />
+          </Margin>
           <Data>{self.encoded_image}</Data>
+          <ScaleMode>Uniform</ScaleMode>
+          <HorizontalAlignment>Center</HorizontalAlignment>
+          <VerticalAlignment>Middle</VerticalAlignment>
+          <ObjectLayout>
+            <DYMOPoint>
+              <X>0.22</X>
+              <Y>0.06666666</Y>
+            </DYMOPoint>
+            <Size>
+              <Width>5.980001</Width>
+              <Height>3.9900005</Height>
+            </Size>
+          </ObjectLayout>
         </ImageObject>
       </LabelObjects>
     </DynamicLayoutManager>
   </DYMOLabel>
-</DesktopLabel>'''
+  <LabelApplication>Blank</LabelApplication>
+  <DataTable>
+    <Columns></Columns>
+    <Rows></Rows>
+  </DataTable>
+</DesktopLabel>"""
     
 class DymoWebService:
     """Handles interactions with the DYMO Web Service for printing labels."""
@@ -86,7 +133,7 @@ class DymoWebService:
         except aiohttp.ClientError as e:
             raise DymoPrinterError(f"Failed to connect to DYMO Web Service: {e}")
 
-    async def print_label(self, label: DymoLabel) -> None:
+    async def print_label(self, label: DymoLabel) -> bool:
         """Sends a print request to the DYMO Web Service."""
         label_xml = label.generate_label_xml()
         label_set_xml = """<LabelSet>
@@ -113,9 +160,9 @@ class DymoWebService:
                     response_text = await response.text()  # Await response text
                     match response.status:
                         case 200:
-                            print("🖨️ Print successful!")
+                          return True
                         case _:
-                            raise DymoPrinterError(f"Print request failed: {response.status} - {response_text}")
+                          raise DymoPrinterError(f"Print request failed: {response.status} - {response_text}")
         except aiohttp.ClientError as e:
             raise DymoPrinterError(f"Request to print label failed: {e}")
 
@@ -159,9 +206,10 @@ class DymoPrinter(AbstractPrinter[bytes], DymoWebService):
 
             return True
         
-        except (DymoPrinterError, Exception) as e:
-            print(f"Print error: {e}")
-            return False
+        except DymoPrinterError as e:
+            raise DymoPrinterError(f"Print error: {e}")
+        except Exception as e:
+             raise Exception(f"Print error: {e}")
 
     async def configure_printer(self, settings: dict) -> None:  # Made async
         """

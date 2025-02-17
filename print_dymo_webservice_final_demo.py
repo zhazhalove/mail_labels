@@ -1,5 +1,5 @@
 import asyncio
-from printer_pkg import DymoPrinter
+from printer_pkg import DymoPrinter, DymoPrinterError
 
 async def main():
     # Initialize the printer
@@ -18,8 +18,13 @@ async def main():
 
         success = await printer.print_document(image_bytes)
         print("Print successful!" if success else "Print failed.")
-    except FileNotFoundError:
-        print("Image file not found!")
+
+    except DymoPrinterError as e:
+        print(f"Dymo Printer Error: {e}")
+    except FileNotFoundError as e:
+        print(f"File Error: {e}")
+    except Exception as e:
+        print(f"Error: {e}")
 
 if __name__ == "__main__":
     asyncio.run(main())
