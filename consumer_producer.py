@@ -10,7 +10,7 @@ from typing import Generic, TypeVar
 from PIL import Image, ImageOps
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
-from opencv_greatest_contour import pdf_bytes_to_image, find_largest_rectangle, crop_rectangle
+from opencv_greatest_contour import pdf_bytes_to_image, find_largest_rectangle, crop_rectangle, pdf_bytes_to_image_zoom
 from document_pkg import Document, DocumentProcessor
 from io import BytesIO
 from printer_pkg import DymoPrinter, DymoPrinterError
@@ -66,7 +66,7 @@ class PdfProcessorUPSCrop(DocumentProcessor[bytes]):
     @staticmethod
     def Process_pdf_sync(pdf_data: bytes) -> bytes:
         try:
-            image_bytes = pdf_bytes_to_image(pdf_data) # Convert PDF bytes to image
+            image_bytes = pdf_bytes_to_image_zoom(pdf_data) # Convert PDF bytes to image
             largest_rect = find_largest_rectangle(image_bytes)  # Detect largest rectangle
             cropped_image = crop_rectangle(image_bytes, largest_rect)
 
