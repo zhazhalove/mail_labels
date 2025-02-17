@@ -7,11 +7,13 @@ It implements a producer-consumer pattern with improved error handling and shutd
 import zmq, zmq.asyncio, asyncio, io, structlog, logging.config, yaml, sys
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
-from PIL import Image
+from PIL import Image, ImageOps
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
-from opencv_greatest_contour import pdf_bytes_to_image, find_largest_rectangle, crop_rectangle
+from opencv_greatest_contour import pdf_bytes_to_image, find_largest_rectangle, crop_rectangle, pdf_bytes_to_image_zoom
 from document_pkg import Document, DocumentProcessor
+from io import BytesIO
+from printer_pkg import DymoPrinter, DymoPrinterError
 
 
 PNG_OUTPUT_FOLDER = Path("output_png")
@@ -64,7 +66,7 @@ class PdfProcessorUPSCrop(DocumentProcessor[bytes]):
     @staticmethod
     def Process_pdf_sync(pdf_data: bytes) -> bytes:
         try:
-            image_bytes = pdf_bytes_to_image(pdf_data) # Convert PDF bytes to image
+            image_bytes = pdf_bytes_to_image_zoom(pdf_data) # Convert PDF bytes to image
             largest_rect = find_largest_rectangle(image_bytes)  # Detect largest rectangle
             cropped_image = crop_rectangle(image_bytes, largest_rect)
 
@@ -167,6 +169,7 @@ async def consumer(queue: MessageQueue[Document], processor: DocumentProcessor[b
             result: bytes = await processor.process(document)
             
       
+            # save original shipment label
             if result:
                 output_filename = PNG_OUTPUT_FOLDER.joinpath(f"{document.filename}.png")
                 with open(output_filename, "wb") as f:
@@ -175,16 +178,50 @@ async def consumer(queue: MessageQueue[Document], processor: DocumentProcessor[b
             else:
                 logger.error("Processing failed for document", filename=document.filename, script=sys.argv[0])
 
-            # if result:
-            #     dymo_printer = DymoPrinterWin("\\\\network-printer-name")
-            #     dymo_printer.configure_printer({"dpi": 300, "paper_size": "104mm x 159mm"})
-            #     dymo_printer.print_document(result)
-            # else:
-            #     print(f"Printing failed for document: {document.filename}")
 
+            # print shipment label
+            if result:
+
+                printer = DymoPrinter(printer_name="DYMO LabelWriter 4XL")
+
+                printer_status = await printer.get_status()
+
+                if printer_status.strip().lower() != "online":
+                     raise Exception(f"Printer is offline - {printer.printer_name}")
+                
+                
+                # Target label dimensions in pixels (6" x 4" at 300 DPI)
+                LABEL_WIDTH_PX = 1800  # 6 inches * 300 DPI
+                LABEL_HEIGHT_PX = 1200  # 4 inches * 300 DPI
+                TARGET_DPI = 300  # Desired DPI for printing
+
+                # Open image from bytes and process it
+                with BytesIO(result) as image_stream:
+
+                    # convert to PIL
+                    with Image.open(image_stream) as image:
+
+                        # Convert to grayscale
+                        image = image.convert("L")
+
+                        # Resize while maintaining aspect ratio (adds white space if necessary)
+                        image_scaled = ImageOps.contain(image, (LABEL_WIDTH_PX, LABEL_HEIGHT_PX), Image.Resampling.LANCZOS)
+
+                        # Save the modified image to a buffer in PNG format
+                        with BytesIO() as image_scaled_buffer:
+                            image_scaled.save(image_scaled_buffer, format="PNG")
+                            print_label = image_scaled_buffer.getvalue()
+                
+                success = await printer.print_document(print_label)
+                
+                if success:
+                    logger.info("shipment label printed", script=sys.argv[0])
+                else:
+                    logger.error("shipment label FAILED to print", script=sys.argv[0])
+   
         except asyncio.CancelledError:
             break
-        except Exception as e:
+        except (Exception, DymoPrinterError) as e:
             logger.exception("Consumer error", error=str(e), script=sys.argv[0])
             queue.task_done()
         else:

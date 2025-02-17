@@ -7,6 +7,16 @@ from PIL import Image  # Used for handling images
 import matplotlib.pyplot as plt  # Used for displaying images
 from typing import Optional, Tuple
 
+def pdf_to_image_matrix(pdf_path: str, page_num: int = 0, zoom: float = 2.0) -> np.ndarray:
+    """Convert a specified PDF page to an image format using zoom to improve image text quality"""
+    doc = fitz.open(pdf_path)  # Open the PDF file
+    page = doc[page_num]  # Select the desired page
+    matrix = fitz.Matrix(zoom, zoom) # Scale the image to incrase resolution
+    pix = page.get_pixmap(matrix=matrix)  # Render the page as a pixel map
+    image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)  # Convert to a PIL image
+    return np.array(image)  # Convert the image to a NumPy array for OpenCV processing
+
+
 def pdf_to_image(pdf_path: str, page_num: int = 0) -> np.ndarray:
     """Convert a specified PDF page to an image format."""
     doc = fitz.open(pdf_path)  # Open the PDF file
@@ -49,6 +59,7 @@ def crop_rectangle(image: np.ndarray, rect: Optional[Tuple[int, int, int, int]])
 
 def process_pdf_and_extract_label(pdf_path: str, output_path: str) -> None:
     """Extract the largest rectangular region (e.g., shipping label) from a PDF and save it as an image."""
+    # image = pdf_to_image(pdf_path)  # Convert PDF to image
     image = pdf_to_image(pdf_path)  # Convert PDF to image
     largest_rect = find_largest_rectangle(image)  # Detect largest rectangle
     highlighted_image = highlight_rectangle(image, largest_rect)

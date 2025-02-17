@@ -10,10 +10,20 @@ def pdf_to_image(pdf_path: str, page_num: int = 0) -> np.ndarray:
     doc = fitz.open(pdf_path)  # Open the PDF file
     return _convert_pdf_page_to_image(doc, page_num)
 
+def pdf_to_image_zoom(pdf_path: str, page_num: int = 0, zoom: float = 2.0) -> np.ndarray:
+    """Convert a specified PDF page to an image format from a file path."""
+    doc = fitz.open(pdf_path)  # Open the PDF file
+    return _convert_pdf_page_to_image_zoom(doc, page_num, zoom=zoom)
+
 def pdf_bytes_to_image(pdf_bytes: bytes, page_num: int = 0) -> np.ndarray:
     """Convert a specified PDF page to an image format from PDF bytes."""
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")  # Open PDF from bytes
     return _convert_pdf_page_to_image(doc, page_num)
+
+def pdf_bytes_to_image_zoom(pdf_bytes: bytes, page_num: int = 0, zoom: float = 2.0) -> np.ndarray:
+    """Convert a specified PDF page to an image format from PDF bytes."""
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")  # Open PDF from bytes
+    return _convert_pdf_page_to_image_zoom(doc, page_num, zoom=zoom)
 
 def _convert_pdf_page_to_image(doc: fitz.Document, page_num: int) -> np.ndarray:
     """Helper function to convert a PDF page to an image."""
@@ -21,6 +31,17 @@ def _convert_pdf_page_to_image(doc: fitz.Document, page_num: int) -> np.ndarray:
     pix = page.get_pixmap()  # Render the page as a pixel map
     image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)  # Convert to a PIL image
     return np.array(image)  # Convert the image to a NumPy array for OpenCV processing
+
+def _convert_pdf_page_to_image_zoom(doc: fitz.Document, page_num: int, zoom: float = 2.0) -> np.ndarray:
+    """Helper function to convert a PDF page to an image.
+       Use default zoom scaling to imporve text quality
+    """
+    page = doc[page_num]  # Select the desired page
+    matrix = fitz.Matrix(zoom, zoom) # Scale the image to incrase resolution
+    pix = page.get_pixmap(matrix=matrix)  # Render the page as a pixel map
+    image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)  # Convert to a PIL image
+    return np.array(image)  # Convert the image to a NumPy array for OpenCV processing
+
 
 
 
