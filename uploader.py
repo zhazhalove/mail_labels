@@ -29,6 +29,9 @@ import os, time, zmq, structlog, logging.config, yaml, sys
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from typing import Dict
+import fitz  # PyMuPDF
+from io import BytesIO
+
 
 # Define the ZeroMQ bind address
 ZMQ_CONNECT_ADDRESS = "tcp://localhost:5555"  # Use * for all available interfaces
@@ -80,6 +83,46 @@ class PDFEventProcessor(FileSystemEventHandler):
                 del self.last_checked_mtimes[filename]  # Remove from tracking
                 logger.info("Removed tracking for deleted PDF", filename=filename, script=sys.argv[0])
 
+    def split_pdf_bytes(self, pdf_bytes: bytes) -> dict[int, bytes]:
+        """
+        Splits a PDF (provided as bytes) into individual pages and returns them as a dictionary of bytes.
+        
+        Args:
+            pdf_bytes (bytes): The PDF file content in bytes.
+
+        Returns:
+            dict[int, bytes]: A dictionary where keys are page numbers (1-based) and values are PDF page data as bytes.
+
+        Raises:
+            ValueError: If the input is not valid PDF bytes.
+            RuntimeError: If there is an issue processing the PDF.
+        """
+        if not isinstance(pdf_bytes, bytes):
+            raise ValueError("Input must be a bytes object representing a PDF file.")
+
+        try:
+            with fitz.open("pdf", pdf_bytes) as doc:
+                if len(doc) == 0:
+                    raise ValueError("The provided PDF is empty or invalid.")
+
+                split_pages = {}
+
+                for page_num in range(len(doc)):
+                    with fitz.open() as new_doc:  # Create an in-memory PDF document
+                        new_doc.insert_pdf(doc, from_page=page_num, to_page=page_num)  # Correct method usage
+
+                        with BytesIO() as output_bytes:
+                            new_doc.save(output_bytes)
+                            split_pages[page_num + 1] = output_bytes.getvalue()
+
+                return split_pages
+
+        except fitz.FileDataError:
+            raise ValueError("The provided file is not a valid PDF.")
+
+        except Exception as e:
+            raise RuntimeError(f"An unexpected error occurred: {e}")
+
     def process_file_event(self, event):
         if not event.is_directory:  # Ignore directory changes
             filepath = event.src_path
@@ -98,8 +141,12 @@ class PDFEventProcessor(FileSystemEventHandler):
                         try:
                             with open(filepath, "rb") as f:
                                 pdf_data = f.read()
-                                self.socket.send(pdf_data, zmq.NOBLOCK)
-                                logger.info("Sent PDF", filename=filename, script=sys.argv[0])
+
+                                pdf_pages: dict[int, bytes] = self.split_pdf_bytes(pdf_bytes=pdf_data)
+
+                                for page_num, page_data in pdf_pages.items():
+                                    self.socket.send(page_data, zmq.NOBLOCK)
+                                    logger.info("Sent PDF", filename=filename, page=page_num, script=sys.argv[0])
 
                             os.remove(filepath)  # Delete the file after successful send
                             logger.info("Deleted PDF after sending", filename=filename, script=sys.argv[0])
