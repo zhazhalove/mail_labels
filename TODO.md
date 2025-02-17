@@ -1,5 +1,5 @@
 - Command-line argument handling
-- ABC printer class
-  - Concrete Dymo printer SDK class
+- use "with" for PIL and BufferIO
+- use asyncio.to_thread inplace of ThreadPool in PdfProcessorUPSCrop (python 3.9+)
 - ZeroMQ Curve for secure transit communication
 - Observability
