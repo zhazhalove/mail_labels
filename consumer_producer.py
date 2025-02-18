@@ -222,7 +222,7 @@ async def consumer(queue: MessageQueue[Document], processor: DocumentProcessor[b
         except asyncio.CancelledError:
             break
         except (Exception, DymoPrinterError) as e:
-            logger.exception("Consumer error", error=str(e), script=sys.argv[0])
+            logger.error("Consumer ERROR: ", error=str(e), script=sys.argv[0])
             queue.task_done()
         else:
             queue.task_done()

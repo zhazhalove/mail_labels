@@ -16,6 +16,10 @@ class DymoPrinterError(Exception):
     """Custom exception for DymoPrinter errors."""
     pass
 
+class DymoWebServiceError(Exception):
+    """Custom exception for DymoWebService errors."""
+    pass
+
 class DymoLabel:
     """Represents a DYMO label with embedded image data."""
     def __init__(self, encoded_image: str):
@@ -127,14 +131,18 @@ class DymoWebService:
                         case 200 if response_text.strip().lower() == "true":
                             return True
                         case 200:
-                            raise DymoPrinterError("DYMO Web Service is running but not responding correctly.")
+                            raise DymoWebServiceError("DYMO Web Service is running but not responding correctly.")
                         case _:
-                            raise DymoPrinterError(f"Unexpected response: {response.status}")
+                            raise DymoWebServiceError(f"Unexpected response: {response.status}")
         except aiohttp.ClientError as e:
-            raise DymoPrinterError(f"Failed to connect to DYMO Web Service: {e}")
+            raise DymoWebServiceError(f"Failed to connect to DYMO Web Service: {e}")
+        except Exception as e:
+            raise DymoWebServiceError(f"check_service_status exception: {e}")
+
 
     async def print_label(self, label: DymoLabel) -> bool:
         """Sends a print request to the DYMO Web Service."""
+        
         label_xml = label.generate_label_xml()
         label_set_xml = """<LabelSet>
     <LabelRecord>
@@ -162,9 +170,11 @@ class DymoWebService:
                         case 200:
                           return True
                         case _:
-                          raise DymoPrinterError(f"Print request failed: {response.status} - {response_text}")
+                          raise DymoWebServiceError(f"Print request failed: {response.status} - {response_text}")
         except aiohttp.ClientError as e:
-            raise DymoPrinterError(f"Request to print label failed: {e}")
+            raise DymoWebServiceError(f"Request to print label failed: {e}")
+        except Exception as e:
+            raise DymoWebServiceError(f"print_label exception: {e}")
 
 
 # Dymo Printer Implementation
@@ -207,9 +217,11 @@ class DymoPrinter(AbstractPrinter[bytes], DymoWebService):
             return True
         
         except DymoPrinterError as e:
-            raise DymoPrinterError(f"Print error: {e}")
+            raise DymoPrinterError(f"print_document ERROR: {e}")
+        except DymoWebServiceError as e:
+            raise DymoPrinterError(f"DymoWebService ERROR: {e}")
         except Exception as e:
-             raise Exception(f"Print error: {e}")
+             raise DymoPrinterError(f"print_document exception: {e}")
 
     async def configure_printer(self, settings: dict) -> None:  # Made async
         """
@@ -226,4 +238,8 @@ class DymoPrinter(AbstractPrinter[bytes], DymoWebService):
             status = await self.check_service_status()  # Proper async call
             return "Online" if status else "Offline"
         except DymoPrinterError as e:
-            return f"Error: {e}"
+            raise DymoPrinterError(f"get_status ERROR: {e}")
+        except DymoWebServiceError as e:
+            raise DymoPrinterError(f"DymoWebService ERROR: {e}")
+        except Exception as e:
+          raise DymoPrinterError(f"DymoPrinter get_status exception: {e}")
