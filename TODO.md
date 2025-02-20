@@ -1,5 +1,4 @@
 - Command-line argument handling
-- support multiple pages each with a shipping label
 - use "with" for PIL and BufferIO
 - move consumer function image scale to it's own function.
 - use asyncio.to_thread inplace of ThreadPool in PdfProcessorUPSCrop (python 3.9+)
