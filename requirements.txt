@@ -9,7 +9,6 @@ PyYAML
 opencv-python
 numpy
 matplotlib
-requests
 urllib3
 aiohttp
 ./opencv_greatest_contour
