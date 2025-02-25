@@ -10,7 +10,7 @@ from typing import Generic, TypeVar
 from PIL import Image, ImageOps
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
-from opencv_greatest_contour import pdf_bytes_to_image, find_largest_rectangle, crop_rectangle, pdf_bytes_to_image_zoom
+from opencv_greatest_contour import find_largest_rectangle, crop_rectangle, pdf_bytes_to_image_zoom
 from document_pkg import Document, DocumentProcessor
 from io import BytesIO
 from printer_pkg import DymoPrinter, DymoPrinterError
