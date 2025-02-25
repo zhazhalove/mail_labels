@@ -11,6 +11,7 @@ numpy
 matplotlib
 urllib3
 aiohttp
+pyinstaller
 ./opencv_greatest_contour
 ./printer_pkg
 ./document_pkg
