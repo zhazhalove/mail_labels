@@ -17,4 +17,3 @@ test_samples/
 build/
 dist/
 *.spec
-Release/
