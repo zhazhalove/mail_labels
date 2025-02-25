@@ -14,3 +14,6 @@ printer_pkg/build
 printer_pkg/printer_pkg.egg-info
 printer_pkg/printer_pkg/__pycache__
 test_samples/
+build/
+dist/
+*.spec
