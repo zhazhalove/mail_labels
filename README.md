@@ -65,6 +65,7 @@ Dependencies include:
 - `requests` (for handling HTTP requests)
 - `urllib3` (for managing HTTP connections)
 - `aiohttp` (for asynchronous HTTP requests)
+- `pyinstaller` (Python script to binary file)
 
 ## Usage
 
@@ -111,6 +112,15 @@ Logging settings are defined in `logging_config.yaml`. You can adjust verbosity,
 - If no receiver is available, the uploader logs a warning and skips the file.
 - Processing failures in the consumer log an error but do not halt execution.
 - Graceful shutdown is implemented for clean exits.
+
+## Releae Build
+
+```PowerShell
+
+pyinstaller --onefile --hidden-import=pythonjsonlogger.jsonlogger consumer_producer.py
+
+pyinstaller --onefile --hidden-import=pythonjsonlogger.jsonlogger .\uploader.py
+```
 
 ## License
 
